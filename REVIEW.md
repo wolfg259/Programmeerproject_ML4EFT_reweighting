@@ -16,30 +16,18 @@ Er zijn wat mij betreft 3 factoren die ervoor hebben gezordg dat ik de comments 
 
 ### Voorbeelden
 
-## Probleem 1: Comments en docstrings
-Beide reviewers hadden uiteindelijk toch hulp nodig met het door 
+## Probleem 2: Parallelle implementatie
 ### 1. Wat is het tegengekomen probleem?
+Beide reviewers kwamen na overleg met mij tot de conclusie dat het makkelijker kan dan het nu is om hetzelfde framework met niet-reweighted data te gebruiken, wat uiteindelijk ook moet kunnen. Het opleveren van een volwaardige implementatie, waarin dus ergens in de settings-JSON ingesteld kan worden of er wel of geen gebruik gemaakt moet worden van reweighting.
 ### 2. Hoe zou je dit beter kunnen maken?
+Het implementeren van deze optie was oorspronkelijk opgenomen in de planning van dit project, maar daar ben ik niet aan toegekomen. Het is echter wel nodig voordat de reweighted setup deel van de *main*-branch van ML4EFT kan worden. Hier wordt de komende tijd aan gewerkt. Als dit niet het geval was zou er ergens in de documentatie beter uitgelegd kunnen staan hoe wel of niet gebruik te maken is van reweighting.
 ### 3. Wat voor afweging maak je? 
-### Voorbeelden
+Dezelfde afwegingen als bij probleem 1 speelden hier; doordat het framework nog in een vroeg stadium is werd het door de originele auteurs als belangrijker geacht dat er eerste resultaten verkregen konden worden met reweighted data dan dat alles gebruiksvriendelijk geïmplementeerd werd. Dit neemt niet weg dat het versimpelen van het gebruik van het framework een belangrijke stap in de toekomst is.
 
-## Probleem 1: Comments en docstrings
-Beide reviewers hadden uiteindelijk toch hulp nodig met het door 
+## Probleem 3: Checks, tests en tussentijdse output
 ### 1. Wat is het tegengekomen probleem?
+Er zijn niet alleen geen tests aanwezig voor het bestaande framework, maar ook tijdens het runnen van het trainingsscript zijn er nauwelijks tussentijdse "checks" die iets vertellen over hoe het trainen verloopt, naast het printen van de loss.
 ### 2. Hoe zou je dit beter kunnen maken?
+Er zou een testsuite geschreven kunnen worden voor (delen van) het framework, en er zou gekeken kunnen worden naar andere plekken in het proces waarbij iets van validerende output geprint of opgeslagen kan worden.
 ### 3. Wat voor afweging maak je? 
-### Voorbeelden
-
-## Probleem 1: Comments en docstrings
-Beide reviewers hadden uiteindelijk toch hulp nodig met het door 
-### 1. Wat is het tegengekomen probleem?
-### 2. Hoe zou je dit beter kunnen maken?
-### 3. Wat voor afweging maak je? 
-### Voorbeelden
-
-## Probleem 1: Comments en docstrings
-Beide reviewers hadden uiteindelijk toch hulp nodig met het door 
-### 1. Wat is het tegengekomen probleem?
-### 2. Hoe zou je dit beter kunnen maken?
-### 3. Wat voor afweging maak je? 
-### Voorbeelden
+Het ML4EFT framework is complex en best groot, ondanks dat het nog niet af is. Het schrijven van een testsuite voor alle code zou een programmeerproject op zich kunnen zijn, en daarbovenop is alle code die voordat er over reweighting nagedacht werd al uitvoerig op andere manieren getest en ge-*benchmarked* (zie bijvoorbeeld het [originele paper waarin ML4EFT gepresenteerd werd (Ambrosio *et al.*, 2023)](https://link.springer.com/content/pdf/10.1007/JHEP03(2023)033.pdf)). Hierom is er gekozen om zoals ook voor eerdere problemen geldt eerst reweighting werkend te krijgen, en daarna kan er naar verdere tests en andere aspecten van een volwaardige package gekeken worden. Anderzijds is het zo dat ML4EFT niet alleen een ml-framework is, wat het invoegen van tests tussen het trainen en het opleveren van een getraind model al bemoeilijkt, maar ook nog een sterk theoretisch gebonden en situatie-afhankelijk concept probeert te implementeren. Hierdoor zijn er voor zover ik kon bedenken weinig tot geen concrete outputs die er geprint of anderzijds zichtbaar gemaakt konden worden om te bevestigen of alles verloopt zoals gehoopt, naast het printen van training en validation loss per training epoch.

@@ -42,7 +42,7 @@ class MLP(nn.Module):
         super().__init__()
 
         input_size = architecture[0]
-        hidden_sizes = architecture[1:-1]
+        hidden_sizes = architecture[1: -1]
         output_size = architecture[-1]
 
         # Create the network based on the specified hidden sizes
@@ -122,7 +122,7 @@ class Classifier(nn.Module):
         self.n_alpha_1 = MLP(architecture)
         self.n_alpha_2 = MLP(architecture)
 
-    def forward(self, x: ArrayLike, c: float) -> (torch.FloatTensor, MLP, MLP):
+    def forward(self, x: ArrayLike, c: float) -> Tuple[torch.FloatTensor, MLP, MLP]:
         """
 
         Parameters
@@ -196,7 +196,7 @@ class PreProcessing():
         self.xsec_eft = df_eft_full.iloc[0, 0]
         self.df_eft = self.df_sm
 
-    def feature_scaling(self, fitter: Fitter, scaler_path: dict) -> (pd.DataFrame, pd.DataFrame):
+    def feature_scaling(self, fitter: Fitter, scaler_path: dict) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
 
         Parameters
@@ -305,7 +305,7 @@ class EventDataset(data.Dataset):
     def __len__(self) -> int:
         return len(self.events)
 
-    def __getitem__(self, idx: int) -> (float, float, float):
+    def __getitem__(self, idx: int) -> Tuple[float, float, float]:
         data, weight, label = self.events[idx], self.weights[idx], self.labels[idx]
         return data, weight, label
 
@@ -422,7 +422,7 @@ class Fitter:
         # start the training
         self.train_classifier(data_train, data_val)
 
-    def load_data(self) -> (EventDataset, EventDataset):
+    def load_data(self) -> Tuple[EventDataset, EventDataset]:
         """
         Constructs training and validation sets
 
@@ -707,7 +707,7 @@ class Fitter:
                 labels: torch.Tensor, # (n_dat x 1)
                 w_e: torch.Tensor, # (n_dat x n_weight_values)
                 nn_lin: MLP, 
-                nn_quad: MLP) -> torch.Tensor # 1 x 1:
+                nn_quad: MLP) -> torch.Tensor: # 1 x 1:
         """
         Loss function
 
