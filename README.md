@@ -5,7 +5,7 @@ Modern particle physics tries to obtain theory-confirming results from the very 
 The code under the *reweighting*-branch of this ML4EFT fork contains an implementation of event reweighting within the ML4EFT framework. Specifically, the file 'core/classifier.py' was adjusted and partially reworked in order to accept reweighting functionality. Reweighting here implies that instead of generating a dataset per coefficient configuration, the user generates one dataset containing $n_{coefficients}$ weight values per event, effectively reducing the simulation computation scaling with the number of coefficients from $O(n^2)$ to $O(1)$. A model can now be trained on the same dataset but with different event weights, instead of on different datasets. This brings the ML4EFT framework one step closer to being applicable to global particle physics fits, for example on the SMEFT. The execution of a fit now becomes a single line of code for a SMEFT fit. A full pipeline example from observable acquisition from raw data to plotting of model output can be found in 'sample_pipeline.ipynb'.
 
 General performance benchmarks show that this reweighted, unbinned approach presents better constraining power than binned approaches, such as when looking at models applied to simulated test-datasets:
-![posterior plot](q_bh2f_nh2f_nh8f.png)
+![posterior plot](images/q_bh2f_nh2f_nh8f.png)
 
 The ML4EFT framework is made available via the [Python Package Index](https://pypi.org/project/ml4eft/) (pip) and can be installed directly 
 by running
