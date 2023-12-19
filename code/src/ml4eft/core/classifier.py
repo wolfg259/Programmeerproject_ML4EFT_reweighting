@@ -2,7 +2,6 @@
 
 """
 
-# !/usr/bin/env python
 # coding: utf-8
 import logging
 import torch
@@ -14,36 +13,31 @@ import json
 import os
 import time
 import pandas as pd
-from joblib import dump, load
-
-from matplotlib import pyplot as plt
-from matplotlib import rc
 from torch import nn
-from sklearn.model_selection import train_test_split
 import shutil
-import ml4eft.analyse.analyse as analyse
 from sklearn.preprocessing import StandardScaler, RobustScaler, QuantileTransformer
 import joblib
 import sys
-
-#rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
-rc('text', usetex=False)
+from numpy.typing import ArrayLike
 
 
 class MLP(nn.Module):
-    """ Multi Layer Perceptron that serves as building block for the binary classifier
+    """ Multi Layer Perceptron that serves as building block for the binary
+    classifier
 
     """
 
-    def __init__(self, architecture):
+    def __init__(self, architecture: ArrayLike) -> None:
         """
 
         Parameters
         ----------
         architecture: array_like
-            ``(N, ) ndarray`` that specifies the MLP's architecture as the number of input nodes followed
-            by the number of hidden nodes in each consecutive hidden layer. The last entry must corespond
-            to the number of output units.
+            ``(N, ) ndarray`` that specifies the MLP's architecture as the
+            number of input nodes followed by the number of hidden nodes in
+            each consecutive hidden layer. The last entry must correspond to
+            the number of output units.
+
         """
         super().__init__()
 
@@ -55,12 +49,13 @@ class MLP(nn.Module):
         layers = []
         layer_sizes = [input_size] + hidden_sizes
         for layer_index in range(1, len(layer_sizes)):
-            layers += [nn.Linear(layer_sizes[layer_index - 1], layer_sizes[layer_index]), nn.ReLU()]
+            layers += [nn.Linear(layer_sizes[layer_index - 1],
+                        layer_sizes[layer_index]), nn.ReLU()]
         layers += [nn.Linear(layer_sizes[-1], output_size)]
         self.layers = nn.Sequential(
             *layers)
 
-    def forward(self, x):
+    def forward(self, x: ArrayLike) -> torch.FloatTensor:
         """
         Performs a forward pass of the MLP
 
@@ -79,33 +74,35 @@ class MLP(nn.Module):
 
 
 class CustomActivationFunction(nn.Module):
-    """
-    Class to construct custom activation functions
+    """ Class to construct custom activation functions
+
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.name = self.__class__.__name__
         self.config = {"name": self.name}
 
 
 class ConstraintActivation(CustomActivationFunction):
-    """Class to transform the classifier output to ensure a positive likelihood ratio
+    """ Class to transform the classifier output to ensure a positive likelihood
+    ratio
 
     """
 
-    def __init__(self, c):
+    def __init__(self, c: float) -> None:
         """
 
         Parameters
         ----------
         c: float
-            Traning parameter :math:`c^{(\mathrm{tr})}` at which the EFT data set is generated
+            Traning parameter :math:`c^{(\mathrm{tr})}` at which the EFT data
+            set is generated
         """
         super().__init__()
         self.c = c
 
-    def forward(self, x):
+    def forward(self, x: ArrayLike) -> torch.FloatTensor:
         if self.c > 0:
             return torch.relu(x) - 1 / self.c + 1e-6
         else:
@@ -114,24 +111,26 @@ class ConstraintActivation(CustomActivationFunction):
 
 
 class Classifier(nn.Module):
-    """ The decssion function :math:`g(x, c)`
+    """ The decision function `g(x, c)`
 
     Implementation of the decision boundary `g(x, c)`
     """
 
-    def __init__(self, architecture):
+    def __init__(self, architecture: ArrayLike) -> None:
         super().__init__()
-    
+
         self.n_alpha_1 = MLP(architecture)
         self.n_alpha_2 = MLP(architecture)
 
-    def forward(self, x, c):
+    def forward(self, x: ArrayLike, c: float) -> (torch.FloatTensor, MLP, MLP):
         """
 
         Parameters
         ----------
         x: array_like
             Input ``(N, ) torch.Tensor`` with ``N`` the number of input nodes
+        c: float
+            coefficient value
 
         Returns
         -------
@@ -150,9 +149,10 @@ class Classifier(nn.Module):
 class PreProcessing():
     """
     A feature preprocessor and data loader
+
     """
 
-    def __init__(self, fitter, path):
+    def __init__(self, fitter: Fitter, path: dict) -> None:
         """
 
         Parameters
@@ -162,6 +162,7 @@ class PreProcessing():
         path: dict
             Dictionary with paths to the SM and EFT dataset, e.g:
             :code:`{'sm': <path_to_sm_dataset>, 'eft': <path_to_eft_dataset>}`
+
         """
 
         self.path = path
@@ -171,38 +172,31 @@ class PreProcessing():
         elif fitter.scaler_type == 'standardise':
             self.scaler = StandardScaler()
         else:
-            self.scaler = QuantileTransformer(n_quantiles=1000, output_distribution='normal')
+            self.scaler = QuantileTransformer(n_quantiles=1000,
+                                                output_distribution='normal')
 
         self.load_data(fitter)
 
-    def load_data(self, fitter):
+    def load_data(self, fitter: Fitter) -> None:
         """
         Loads ``pandas.DataFrame`` into SM and EFT dataframes.
         """
-        # sm
-        
-
-        df_sm_full = (pd.read_pickle(self.path['sm'], compression="infer"))
+        # standard model
+        df_sm_full = pd.read_pickle(self.path['sm'], compression="infer")
         df_sm_wo_xsec = df_sm_full.iloc[1:, :]
-    
+
         # cross section before cuts
         self.xsec_sm = df_sm_full.iloc[0, 0]
-        #self.df_sm = df_sm_wo_xsec.sample(fitter.n_dat)
-        self.df_sm = pd.DataFrame()
-        self.df_sm['m_tt_0'] = df_sm_wo_xsec.iloc[:fitter.n_dat, :]['m_tt']
-        self.df_sm['m_tt_1'] = df_sm_wo_xsec.iloc[:fitter.n_dat, :]['m_tt']
-        #self.df_sm = df_sm_wo_xsec.iloc[:fitter.n_dat]
+        self.df_sm = df_sm_wo_xsec.iloc[:fitter.n_dat, :]
+
         # eft
-        # +5
-        
-        df_eft_full = pd.read_pickle('/data/theorie/wgautier/wgautier/followup/sample_data/non_reweighted/tt_ctGRe/events_right.pkl.gz', compression="infer")
-        df_eft_wo_xsec = df_eft_full.iloc[1:, :]
+        df_eft_full = pd.read_pickle(self.path['eft'], compression="infer")
+
         # cross section before cuts
         self.xsec_eft = df_eft_full.iloc[0, 0]
-        self.df_eft = df_eft_full.iloc[:fitter.n_dat, :].reset_index(drop=True)
-        #df_eft_wo_xsec.sample(fitter.n_dat)
+        self.df_eft = self.df_sm
 
-    def feature_scaling(self, fitter, scaler_path):
+    def feature_scaling(self, fitter: Fitter, scaler_path: dict) -> (pd.DataFrame, pd.DataFrame):
         """
 
         Parameters
@@ -219,26 +213,20 @@ class PreProcessing():
         df_eft_scaled : pandas.DataFrame
             Rescaled EFT events
         """
-        #import pdb; pdb.set_trace()
-        df = pd.concat([self.df_sm, self.df_eft], axis=0)        #print(self.df_sm, self.df_eft)
+        df = pd.concat([self.df_sm, self.df_eft])
         # fit the scaler transformer to the eft and sm features
-        #self.scaler.fit(df[fitter.features])
-        self.scaler.fit(df)
+        self.scaler.fit(df[fitter.features])
 
         # rescale the sm and eft data
-        #features_sm_scaled = self.scaler.transform(self.df_sm[fitter.features])
-        #features_eft_scaled = self.scaler.transform(self.df_eft[fitter.features])
-        features_sm_scaled = self.scaler.transform(self.df_sm)
-        features_eft_scaled = self.scaler.transform(self.df_eft)
+        features_sm_scaled = self.scaler.transform(self.df_sm[fitter.features])
+        features_eft_scaled = self.scaler.transform(
+            self.df_eft[fitter.features])
 
 
         # convert transformed features to dataframe
-        #df_sm_scaled = pd.DataFrame(features_sm_scaled, columns=fitter.features)
-        #df_eft_scaled = pd.DataFrame(features_eft_scaled, columns=fitter.features)
-        df_sm_scaled = pd.DataFrame(features_sm_scaled)
-        df_eft_scaled = pd.DataFrame(features_eft_scaled)
-        #print(df_sm_scaled, df_eft_scaled)
-        #sys.exit()
+        df_sm_scaled = pd.DataFrame(features_sm_scaled, columns=fitter.features)
+        df_eft_scaled = pd.DataFrame(features_eft_scaled,
+                                        columns=fitter.features)
 
         # save the scaler
         joblib.dump(self.scaler, scaler_path)
@@ -251,7 +239,14 @@ class EventDataset(data.Dataset):
     Event loader
     """
 
-    def __init__(self, df, df_weights, xsec, path, n_dat, features, hypothesis=0):
+    def __init__(self,
+                df: pd.DataFrame,
+                df_weights: pd.DataFrame,
+                xsec: float,
+                path: dict,
+                n_dat: int,
+                features: ArrayLike,
+                hypothesis=0) -> None:
         """
         EventDataset constructor
 
@@ -259,6 +254,8 @@ class EventDataset(data.Dataset):
         ----------
         df: pandas.DataFrame
             Event DataFrame
+        df_weights: pandas.DataFrame
+            Weights DataFrame
         xsec: float
             inclusive cross-section
         path: str
@@ -284,9 +281,10 @@ class EventDataset(data.Dataset):
 
         self.event_loader(path)
 
-    def event_loader(self, path):
+    def event_loader(self, path: dict) -> None:
         """
-        Set the weights of the events, labels and convert the events to torch.Tensor,
+        Set the weights of the events, labels and convert the events to
+        torch.Tensor
 
         Parameters
         ----------
@@ -295,20 +293,21 @@ class EventDataset(data.Dataset):
         """
         n_dat = len(self.df)
 
-        #self.weights = torch.tensor(self.df['weight'].values).unsqueeze(-1)
         self.weights = torch.tensor(self.df_weights.values)
-        #self.events = torch.tensor(self.df[self.features].values)
-        self.events = torch.tensor(self.df.values)
-        self.labels = torch.ones(n_dat).unsqueeze(-1) if self.hypothesis else torch.zeros(n_dat).unsqueeze(-1)
+        self.events = torch.tensor(self.df[self.features].values)
+        if self.hypothesis:
+            self.labels = torch.ones(n_dat).unsqueeze(-1)
+        else:
+            self.labels = torch.zeros(n_dat).unsqueeze(-1)
 
         logging.info("Dataset loaded from {}".format(path))
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.events)
 
-    def __getitem__(self, idx):
-        data_sample, weight_sample, label_sample = self.events[idx], self.weights[idx], self.labels[idx]
-        return data_sample, weight_sample, label_sample
+    def __getitem__(self, idx: int) -> (float, float, float):
+        data, weight, label = self.events[idx], self.weights[idx], self.labels[idx]
+        return data, weight, label
 
 
 class Fitter:
@@ -316,7 +315,12 @@ class Fitter:
     Training class
     """
 
-    def __init__(self, json_path, mc_run, c_name, output_dir, print_log=False):
+    def __init__(self,
+                json_path: str,
+                mc_run: int,
+                c_name: str,
+                output_dir: str,
+                print_log=False) -> None:
         """
         Fitter constructor
 
@@ -342,25 +346,22 @@ class Fitter:
         self.process_id = self.run_options["process_id"]
         self.lr = self.run_options["lr"]
         self.n_batches = self.run_options["n_batches"]
-
         self.loss_type = self.run_options['loss_type']
         self.scaler_type = self.run_options['scaler_type']
         self.patience = self.run_options['patience']
         self.val_ratio = self.run_options['val_ratio']
         self.features = self.run_options['features']
-
         self.c_train = self.run_options["c_train"]
-
         self.n_dat = self.run_options['n_dat']
         self.epochs = self.run_options['epochs']
-        self.network_size = [len(self.features)] + self.run_options['hidden_sizes'] + [
-            self.run_options['output_size']]
-        self.event_data_path = self.run_options['event_data']  # path to training data
+        self.network_size = ([len(self.features)] +
+                                self.run_options['hidden_sizes'] +
+                                [self.run_options['output_size']])
+        self.event_data_path = self.run_options['event_data']
         self.weight_data_path = self.run_options['weight_data']
-
-
         self.mc_run = mc_run
 
+        # make dirs <y>/<m>/<d> within models dir to save trained model
         output_dir = os.path.join(output_dir, time.strftime("%Y/%m/%d"))
         os.makedirs(output_dir, exist_ok=True)
 
@@ -378,13 +379,12 @@ class Fitter:
             os.makedirs(mc_path)
             os.makedirs(log_path)
 
-        # initialise all paths to None, unless we run at pure quadratic or cross term level
+        # initialise all paths to None, unless we run at pure quad or ct level
         self.path_lin_1 = self.path_lin_2 = self.path_quad_1 = self.path_quad_2 = None
 
-        
         self.path_dict['eft_data_path'] = '{eft_coeff}/events_{mc_run}.pkl.gz'
         self.model = Classifier(self.network_size)
-       
+
         self.path_dict['eft_weights_path'] = '{eft_coeff}/weights_{mc_run}.pkl.gz'
 
         self.path_dict['sm_weights_path'] = '/weights_{mc_run}.pkl.gz'
@@ -395,11 +395,14 @@ class Fitter:
 
         # print log to stdout when print_log is True, else only save to log file
         if print_log:
-            handlers = [logging.FileHandler(log_path + '/training_{}.log'.format(current_time)),
-                        logging.StreamHandler(sys.stdout)
-                        ]
+            handlers = [
+                logging.FileHandler(log_path +
+                                    '/training_{}.log'.format(current_time)),
+                logging.StreamHandler(sys.stdout)]
         else:
-            handlers = [logging.FileHandler(log_path + '/training_{}.log'.format(current_time))]
+            handlers = [
+                logging.FileHandler(log_path +
+                                    '/training_{}.log'.format(current_time))]
 
         logging.basicConfig(
             level=logging.INFO,
@@ -419,7 +422,7 @@ class Fitter:
         # start the training
         self.train_classifier(data_train, data_val)
 
-    def load_data(self):
+    def load_data(self) -> (EventDataset, EventDataset):
         """
         Constructs training and validation sets
 
@@ -431,23 +434,27 @@ class Fitter:
             Validation data set
         """
 
-        # event files are stored at event_data_path/sm, event_data_path/lin, event_data_path/quad
-        # or event_data_path/cross for sm, linear, quadratic (single coefficient) and cross terms respectively
-        path_sm = os.path.join(self.event_data_path, self.process_id + '_sm/events_{}.pkl.gz'.format(self.mc_run))
+        # event files are stored at event_data_path/sm, event_data_path/lin,
+        # event_data_path/quad or event_data_path/cross for sm, linear,
+        # quadratic (single coefficient) and cross terms respectively
         path_eft = os.path.join(self.event_data_path,
-                                self.process_id + '_' + self.path_dict['eft_data_path'].format(eft_coeff=self.c_name,
-                                                                                               mc_run=self.mc_run))
-        # weights
+                                self.process_id +
+                                '_' +
+                                self.path_dict['eft_data_path'].format(
+                                    eft_coeff=self.c_name, mc_run=self.mc_run))
+        # weights are stored in weights folder as indicated separately in json
         path_eft_weights = os.path.join(self.weight_data_path,
-                                self.process_id + '_' + self.path_dict['eft_weights_path'].format(eft_coeff=self.c_name,
-                                                                                               mc_run=self.mc_run))
+                                self.process_id +
+                                '_' +
+                                self.path_dict['eft_weights_path'].format(
+                                    eft_coeff=self.c_name, mc_run=self.mc_run))
         path_sm_weights = os.path.join(self.weight_data_path,
-                                self.process_id + '_' + self.path_dict['eft_weights_path'].format(eft_coeff='sm',
-                                                                                               mc_run=self.mc_run))
+                                self.process_id +
+                                '_' +
+                                self.path_dict['eft_weights_path'].format(
+                                    eft_coeff='sm', mc_run=self.mc_run))
 
-
-        path_dict = {'sm': path_sm, 'eft': path_eft}
-        #path_dict = {'eft': path_eft}
+        path_dict = {'sm': path_eft, 'eft': path_eft}
 
         # preprocessing of the data
         preproc = PreProcessing(self, path_dict)
@@ -455,21 +462,13 @@ class Fitter:
         # save the scaler
         scaler_path = os.path.join(self.path_dict['mc_path'], 'scaler.gz')
         df_sm_scaled, df_eft_scaled = preproc.feature_scaling(self, scaler_path)
-        #df_eft_scaled = preproc.feature_scaling(self, scaler_path)
 
-        # create df containing all weight values (possible because feature_scaling
-        # does NOT shuffle order of events, so if ordered when pkls made still ordered)
-        df_weights_sm = pd.DataFrame()
-        df_weights_sm['weight'] = (pd.read_pickle(path_sm))['weight']
+        # create df containing all weight values (possible because 
+        # feature_scaling does NOT shuffle order of events, so if ordered when
+        # pkls made still ordered)
+        df_weights_sm = pd.read_pickle(path_sm_weights)
+        df_weights_eft = pd.read_pickle(path_eft_weights)
 
-        df_wt_0 = (pd.read_pickle('/data/theorie/jthoeve/ML4EFT/training_data/ml4eft20/events_wolf/ctg/point_0/events_0.pkl.gz'))['weight']
-        df_wt_1 = (pd.read_pickle('/data/theorie/jthoeve/ML4EFT/training_data/ml4eft20/events_wolf/ctg/point_1/events_0.pkl.gz'))['weight']
-        df_weights_eft = pd.DataFrame()
-        df_weights_eft['weight_0'] = df_wt_0
-        df_weights_eft['weight_1'] = df_wt_1
-        #df_weights_sm = pd.read_pickle(path_sm_weights)
-        #df_weights_eft = pd.read_pickle(path_eft_weights)
-        
         # construct an eft and a sm data set for each value of c in c_values and make a list out of it
         data_eft = EventDataset(df_eft_scaled,
                                 df_weights_eft,
@@ -478,11 +477,9 @@ class Fitter:
                                 n_dat=self.n_dat,
                                 features=self.features,
                                 hypothesis=0)
-       
 
-        # TODO: see if this works
         data_sm = EventDataset(df_sm_scaled,
-                               df_weights_sm, 
+                               df_weights_sm,
                                xsec=preproc.xsec_sm,
                                path=path_eft,
                                n_dat=self.n_dat,
@@ -496,17 +493,20 @@ class Fitter:
         for dataset in data_all:
             n_val_points = int(self.val_ratio * len(dataset))
             n_train_points = len(dataset) - n_val_points
-            data_split.append(data.random_split(dataset, [n_train_points, n_val_points]))
+            data_split.append(
+                data.random_split(dataset, [n_train_points, n_val_points]))
 
         # collect all the training and validation sets
         data_train, data_val = [], []
         for dataset in data_split:
             data_train.append(dataset[0])
             data_val.append(dataset[1])
-        
+
         return data_train, data_val
 
-    def train_classifier(self, data_train, data_val):
+    def train_classifier(self,
+                        data_train: EventDataset,
+                        data_val: EventDataset) -> None:
         """
         Starts the training of the binary classifier
 
@@ -520,39 +520,53 @@ class Fitter:
         # define the optimizer
         optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
 
-        # Use PyTorche's DataLoader to allow for mini-batches. After each epoch, the minibatches reshuffle.
-        # Create a dataloader object for each eft point + sm and put them all in one big list called train_data_loader
-        # or val_data_loader
+        # Use PyTorch's DataLoader to allow for mini-batches. After each
+        # epoch, the minibatches reshuffle.
+        # Create a dataloader object for each eft point + sm and put them all
+        # in one big list called train_data_loader or val_data_loader
         train_data_loader = [
-            data.DataLoader(dataset_train, batch_size=int(dataset_train.__len__() / self.n_batches), shuffle=True) for
-            dataset_train in data_train]
+            data.DataLoader(dataset_train,
+                            batch_size=int(dataset_train.__len__() /
+                                self.n_batches),
+                            shuffle=True) for dataset_train in data_train]
         val_data_loader = [
-            data.DataLoader(dataset_val, batch_size=int(dataset_val.__len__() / self.n_batches), shuffle=False) for
-            dataset_val in data_val]
+            data.DataLoader(dataset_val,
+                            batch_size=int(dataset_val.__len__() /
+                                self.n_batches),
+                            shuffle=False) for dataset_val in data_val]
 
         # call the training loop
-        self.training_loop(optimizer=optimizer, train_loader=train_data_loader, val_loader=val_data_loader)
+        self.training_loop(optimizer=optimizer,
+                            train_loader=train_data_loader,
+                            val_loader=val_data_loader)
 
-    def training_loop(self, optimizer, train_loader, val_loader):
+    def training_loop(self,
+                        optimizer: torch.optim,
+                        train_loader: ArrayLike,
+                        val_loader: ArrayLike) -> None:
         """
-        Optimize the classifier with `optimizer` on the training data set `train_loader`. Keeps track of potential
-        overfitting through `val_loader`.
+        Optimize the classifier with `optimizer` on the training data set
+        `train_loader`. Keeps track of potential overfitting through
+        `val_loader`.
 
         Parameters
         ----------
         optimizer: torch.optim
             Optimizer, e.g. torch.optim.AdamW
         train_loader: array_like
-            List of torch.utils.data.DataLoader objects, one for the SM and the EFT (training)
+            List of torch.utils.data.DataLoader objects, one for the SM and the
+            EFT (training)
         val_loader: array_like
-            List of torch.utils.data.DataLoader objects, one for the SM and the EFT (validation)
+            List of torch.utils.data.DataLoader objects, one for the SM and the
+            EFT (validation)
         """
         path = self.path_dict['mc_path']
 
-        loss_list_train, loss_list_val = [], []  # stores the training loss per epoch
+        loss_list_train, loss_list_val = [], []  # stores the loss per epoch
 
-        # To be able to keep track of potential over-fitting, introduce a counter that gets increased
-        # by one whenever the the validation loss increases during an epoch
+        # To be able to keep track of potential over-fitting, introduce a
+        # counter that gets increased by one whenever the the validation loss
+        # increases during an epoch
         overfit_counter = 0
 
         # outer loop that runs over the number of epochs
@@ -561,17 +575,18 @@ class Fitter:
 
             # check for plateau
             if len(loss_list_train) > 10:
-                # if the loss after the first epoch queals the latest loss, we reset the weights
+                # if the loss after the first epoch equals the latest loss, we
+                # reset the weights
                 if loss_list_train[1] == loss_list_train[-1]:
-                    logging.info("Detected stagnant training, reset the weights")
+                    logging.info(
+                        "Detected stagnant training, reset the weights")
                     self.model.apply(self.weight_reset)
 
             loss_train, loss_val = 0.0, 0.0
 
             # We save the model parameters at the start of each epoch
-            # TODO: to me all saved epochs on local device not optimal,
-            # disabled for now
-            torch.save(self.model.state_dict(), path + 'trained_nn_{}.pt'.format(epoch))
+            torch.save(self.model.state_dict(),
+                        path +'trained_nn_{}.pt'.format(epoch))
 
             # compute validation loss
             with torch.no_grad():
@@ -581,58 +596,79 @@ class Fitter:
                         loss = 0
                         if isinstance(self.model, Classifier):
                             for k, c_value in enumerate(self.c_train):
-                                #import pdb;pdb.set_trace()
-                                output, nn_lin, nn_quad = self.model(event[:, k].unsqueeze(-1).float(), c_value)
-                                #output, nn_lin, nn_quad = self.model(label.float(), c_value)
+                                output, nn_lin, nn_quad = self.model(
+                                                                event.float(),
+                                                                c_value)
                                 if i == 1:
-                                    loss += self.loss_fn(output, label, weight, nn_lin, nn_quad)
+                                    loss += self.loss_fn(output,
+                                                        label,
+                                                        weight,
+                                                        nn_lin,
+                                                        nn_quad)
                                 else:
-                                    loss += self.loss_fn(output, label, weight[:, k].unsqueeze(-1), nn_lin, nn_quad)
+                                    loss += self.loss_fn(output,
+                                                        label,
+                                                        weight[:, k].unsqueeze(-1),
+                                                        nn_lin, 
+                                                        nn_quad)
                         val_loss += loss
-                    assert val_loss.requires_grad is False
 
                     loss_val += val_loss.item()
 
             # loop over the mini-batches.
             for j, minibatch in enumerate(zip(*train_loader)):
                 train_loss = torch.zeros(1)
-                # loop over all the datasets within the minibatch and compute their contribution to the loss
+                # loop over all the datasets within the minibatch and compute
+                # their contribution to the loss
                 for i, [event, weight, label] in enumerate(minibatch):  # i=0: eft, i=1: sm
                     loss = 0
                     if isinstance(self.model, Classifier):
                         for k, c_value in enumerate(self.c_train):
-                            output, nn_lin, nn_quad = self.model(event[:, k].unsqueeze(-1).float(), c_value)
+                            output, nn_lin, nn_quad = self.model(event.float(),
+                                                                c_value)
                             if i == 1:
-                                loss += self.loss_fn(output, label, weight, nn_lin, nn_quad)
+                                loss += self.loss_fn(output,
+                                                        label,
+                                                        weight,
+                                                        nn_lin,
+                                                        nn_quad)
                             else:
-                                loss += self.loss_fn(output, label, weight[:, k].unsqueeze(-1), nn_lin, nn_quad)
+                                loss += self.loss_fn(output,
+                                                        label,
+                                                        weight[:, k].unsqueeze(-1),
+                                                        nn_lin,
+                                                        nn_quad)
                     train_loss += loss
-    
-                # perform gradient descent after each minibatch. Move to the next epoch when all minibatches are looped over.
+                
+                loss_train += train_loss.item()
+
+                # perform gradient descent after each minibatch. Move to the
+                # next epoch when all minibatches are looped over.
                 optimizer.zero_grad()
                 train_loss.backward()
                 optimizer.step()
-
-                loss_train += train_loss.item()
 
             loss_list_train.append(loss_train)
             loss_list_val.append(loss_val)
 
             training_status = "Epoch {epoch}, Training loss {train_loss}, Validation loss {val_loss}, Overfit counter = {overfit}". \
-                format(time=datetime.datetime.now(), epoch=epoch, train_loss=loss_train, val_loss=loss_val,
-                       overfit=overfit_counter)
+                format(time=datetime.datetime.now(),
+                        epoch=epoch,
+                        train_loss=loss_train,
+                        val_loss=loss_val,
+                        overfit=overfit_counter)
             logging.info(training_status)
 
             np.savetxt(path + 'loss.out', loss_list_train)
             np.savetxt(path + 'loss_val.out', loss_list_val)
 
-            # in case the maximum number of epochs is reached, save the final state
+            # if the maximum number of epochs is reached, save the final state
             if epoch == self.epochs:
                 torch.save(self.model.state_dict(), path + 'trained_nn.pt')
                 break
 
-            # check whether the network is overfitting by increasing the overfit_counter by one if the
-            # validation loss increases during the epoch.
+            # check whether the network is overfitting by increasing the
+            # overfit_counter by one if the validation loss increases.
             if epoch > 20:
                 if loss_val > min(loss_list_val):
                     overfit_counter += 1
@@ -641,17 +677,20 @@ class Fitter:
 
             if overfit_counter == self.patience:
                 stopping_point = epoch - self.patience
-                logging.info("Stopping point reached! Overfit counter = {}".format(overfit_counter))
-                shutil.copyfile(path + 'trained_nn_{}.pt'.format(stopping_point), path + 'trained_nn.pt')
+                logging.info(
+                    "Stopping point reached! Overfit counter = {}".format(
+                        overfit_counter))
+                shutil.copyfile(
+                    path + 'trained_nn_{}.pt'.format(stopping_point),
+                    path + 'trained_nn.pt')
                 logging.info("Backwards stopping done")
                 break
 
-            loss_val_old = loss_val
             iterations += 1
 
         logging.info("Finished training")
 
-    def weight_reset(self, m):
+    def weight_reset(self, m: MLP) -> None:
         """
         Reset the weights and biases associated with the model ``m``.
 
@@ -663,7 +702,12 @@ class Fitter:
         if isinstance(m, nn.Linear):
             m.reset_parameters()
 
-    def loss_fn(self, outputs, labels, w_e, nn_lin, nn_quad):
+    def loss_fn(self,
+                outputs: torch.Tensor, # (n_dat x 1)
+                labels: torch.Tensor, # (n_dat x 1)
+                w_e: torch.Tensor, # (n_dat x n_weight_values)
+                nn_lin: MLP, 
+                nn_quad: MLP) -> torch.Tensor # 1 x 1:
         """
         Loss function
 
@@ -682,21 +726,17 @@ class Fitter:
             Average loss of the mini-batch
         """
 
-        ratio = (1-outputs) / outputs
         lag_mp = 5
         penalty = lag_mp * torch.relu(nn_lin ** 2 - 4 * nn_quad) ** 2
 
-
         if self.loss_type == 'CE':
-            # this will be a tensor of shape n_events x n_coeff_values
-            loss_per_weight = - (1 - labels) * w_e * torch.log(1 - outputs) - labels * w_e * torch.log(outputs)
-            loss = torch.sum(loss_per_weight, dim = 1)
-            #print(torch.sum(loss_per_weight, dim = 1))
-            #sys.exit()
+            loss_per_weight = (-(1 - labels) * w_e * torch.log(1 - outputs) -
+                                labels * w_e * torch.log(outputs) + penalty)
 
         elif self.loss_type == 'QC':
-            loss_per_weight = (1 - labels) * w_e * outputs ** 2 + labels * w_e * (1 - outputs) ** 2 + penalty
-            loss = torch.sum(loss_per_weight, dim = 1)
-
+            loss_per_weight = ((1 - labels) * w_e * outputs ** 2 +
+                                labels * w_e * (1 - outputs) ** 2 + penalty)
+            
         # average over all the losses in the batch
+        loss = torch.sum(loss_per_weight, dim = 1)
         return torch.mean(loss, dim=0)
