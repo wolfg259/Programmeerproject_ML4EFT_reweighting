@@ -1,9 +1,7 @@
 # Reweighting within ML4EFT
 ### Wolf Gautier for *Programmeerproject*, University of Amsterdam
 
-<a href="https://video.uva.nl/media/Screencast%20programmeerproject/0_2z93uuit" target="_blank">
- <img src="https://video.uva.nl/media/Screencast%20programmeerproject/0_2z93uuit" alt="Watch the video" width="240" height="180" border="10" />
-</a>
+### A screencast outlining the project and showing how to execute a reweighted fit can be found [here](https://video.uva.nl/media/Screencast%20programmeerproject/0_2z93uuit).
 
 Modern particle physics tries to obtain theory-confirming results from the very edges of what is experimentally obtainable. Somewhat counterintuïtively, most of the data that is used to do so is presented in binned form, which means any theory fits performed using it are subject to the information loss that is inherent to presenting data in binned form. One approach to mitigating this information loss, thus allowing statistically more significant conclusions to be drawn from the same data, is to use deep neural networks as a way to parameterise likelihood ratios. Bounds on theoretical coefficient values can then be statistically inferred from the trained networks, for example using nested sampling. This approach works on small-scale benchmarks, but quickly becomes computationally unfeasible as the scale increases; the number of simulated datasets that have to be generated scales quadratically with the number of coefficients that are included in a fit. 
 
